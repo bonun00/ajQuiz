@@ -4,18 +4,17 @@ import {
     Button, Top, Asset, IconButton
 } from '@toss/tds-mobile';
 import { useState, useEffect, useRef } from 'react';
+import { db } from './firebaseCongfig.tsx';
+import { collection, getDocs } from 'firebase/firestore';
+
 
 interface Message {
     role: 'bot' | 'user';
     text: string;
 }
 
-const jokes = [
-    { question: '세상에서 가장 슬픈 채소는?', answer: '우엉' },
-    { question: '세상에서 가장 야한 채소는?', answer: '버섯' },
-    { question: '왕이 넘어지면 뭐가 될까?', answer: '킹콩' },
-];
-type joke = {
+
+type Joke = {
     question: string;
     answer: string;
 };
@@ -25,16 +24,38 @@ function QuizScreen () {
     const [inputValue, setInputValue] = useState('');
     const [score, setScore] = useState(0);
     // 맞춘 개그 리스트 상태 추가
-    const [solvedList, setSolvedList] = useState<joke[]>([]);
+    const [solvedList, setSolvedList] = useState<Joke[]>([]);
+    const [jokes, setJokes] = useState<Joke[]>([])
     // 메뉴 열림/닫힘 상태
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     const [messages, setMessages] = useState<Message[]>([
         { role: 'bot', text: '안녕! 넌센스 퀴즈 마스터에 도전해봐!' },
-        { role: 'bot', text: jokes[0].question }
     ]);
     const [isWaiting, setIsWaiting] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
+
+
+
+
+    useEffect(() => {
+        const fetchJokes = async () => {
+            try {
+                const querySnapshot = await getDocs(collection(db, "jokes"));
+                const fetchedJokes = querySnapshot.docs.map(doc => doc.data() as Joke);
+
+                if (fetchedJokes.length > 0) {
+                    setJokes(fetchedJokes);
+                    setMessages([
+                        { role: 'bot', text: fetchedJokes[0].question }
+                    ]);
+                }
+            } catch (error) {
+                setMessages([{ role: 'bot', text: '데이터를 불러오지 못했습니다.' }]);
+            }
+        };
+        fetchJokes();
+    }, []);
 
     useEffect(() => {
         scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -186,11 +207,11 @@ function QuizScreen () {
                     <TextArea
                         variant="box"
                         rows={1}
-                        placeholder={isWaiting ? "대답 기다리는 중..." : "정답 입력..."}
+                        placeholder={jokes.length === 0? "로딩중" : (isWaiting ? "대답 기다리는 중..." : "정답 입력...")}
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}
                         disabled={isWaiting}
-                        onClick={handleSend}
+                        onClick={handleSend||jokes.length === 0}
                     />
                 </div>
                 <Button size="small" onClick={handleSend} disabled={!inputValue.trim() || isWaiting}>
